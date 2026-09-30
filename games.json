@@ -1,0 +1,12 @@
+{
+ "games": [
+  {
+   "slug": "energy-city",
+   "title": "Power Line Tycoon",
+   "published_at": "2026-09-30T16:49:19Z",
+   "source": "54c7b74+dirty",
+   "unlisted": false,
+   "icon": "energy-city/icon.png"
+  }
+ ]
+}

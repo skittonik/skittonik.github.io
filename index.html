@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Games</title>
+<style>
+:root { --bg:#f6f7f9; --card:#fff; --ink:#1c2230; --muted:#6b7385; --line:#e3e6ec; --accent:#2f7df6; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#12151b; --card:#1b2029; --ink:#e8ebf1; --muted:#9097a6; --line:#2a303b; --accent:#5b9bff; }
+}
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width:960px; margin:0 auto; padding:32px 16px 48px; }
+h1 { margin:0 0 4px; font-size:28px; }
+.sub { margin:0 0 24px; color:var(--muted); }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:16px; }
+a.card { display:flex; flex-direction:column; gap:12px; padding:16px; background:var(--card); border:1px solid var(--line);
+  border-radius:16px; color:inherit; text-decoration:none; transition:transform .12s, border-color .12s; }
+a.card:hover { transform:translateY(-2px); border-color:var(--accent); }
+.icon { width:72px; height:72px; border-radius:16px; object-fit:cover; background:var(--line);
+  display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:700; color:var(--muted); }
+.title { font-weight:650; font-size:18px; }
+.meta { color:var(--muted); font-size:13px; }
+.play { margin-top:auto; align-self:flex-start; padding:8px 16px; border-radius:999px; background:var(--accent); color:#fff; font-weight:600; }
+.empty { color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Games</h1>
+<p class="sub">Web builds, newest first. Open on any device.</p>
+<div class="grid"><a class="card" href="energy-city/"><img class="icon" src="energy-city/icon.png" alt=""><div class="title">Power Line Tycoon</div><div class="meta">Updated 2026-09-30 · 54c7b74+dirty</div><span class="play">Play</span></a></div>
+</main>
+</body>
+</html>
