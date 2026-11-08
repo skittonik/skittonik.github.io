@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, minimal-ui, shrink-to-fit=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="generator" content="minit-defold">
+  <title>Stackalot</title>
+  <style>
+/* Minit host shell.
+   The game must fill its slot with no chrome and no scrollbars. The host keeps
+   the frame hidden until the game calls minit.loading_done(), so the Defold
+   loader runs behind the host's own splash and needs no progress UI of its own.
+   Background matches the render script's clear colour so there is no flash of a
+   different colour between the page painting and the first drawn frame. */
+html, body {
+	position: fixed;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	overflow: hidden;
+	background: #59a0d8;
+	/* The game is played by stabbing at it with several fingers at once. Without
+	   these, a fast drag is a back-navigation swipe on iOS and a double-tap is a
+	   zoom -- both of which eat whacks. */
+	touch-action: none;
+	overscroll-behavior: none;
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-tap-highlight-color: transparent;
+	-webkit-touch-callout: none;
+}
+
+/* dmloader.js sizes #app-container itself on every resize (and throws if it is
+   missing), so the id has to stay even though the CSS below would already fill
+   the viewport. */
+#app-container {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+#canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	outline: none;
+	touch-action: none;
+}
+
+canvas:focus, canvas:active { outline: none; border: 0; }
+
+#webgl-not-supported {
+	position: absolute;
+	inset: 0;
+	display: none;
+	align-items: center;
+	justify-content: center;
+	margin: 0 2rem;
+	color: #ffe9b0;
+	font: 600 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+	text-align: center;
+}
+</style>
+  <style>
+	/* The BASE loader in the browser (ADR-026), in Strata's own look (T-029, the director's
+	   pick of four, 2026-11-07): an island in the meadow sky and a castle tower that grows a
+	   floor at a time with the progress, each floor sliding in from a side as in the game.
+	   Bob merges this fragment into the page; Strata's page is the Minit shell, which gets it
+	   at the end of its body, after EngineLoader.load (ADR-036), so the script below shows
+	   the loader as it runs instead of waiting for ProgressView.addProgress. Inside the Minit
+	   app it never shows: the app hides the game behind its own splash until loading_done. */
+	@font-face {
+		font-family: "BaseLoaderFont";
+		src: url("PlayCroc-Cartoon-2.1.ttf") format("truetype");
+		font-display: block;
+	}
+	/* The first paint, before the script below runs: Bob puts that script after dmloader.js,
+	   which the page fetches first, and the live page showed the shell's plain blue for over
+	   a second (2026-11-07). The sky and the title scroll come from this style at once, where
+	   the loader's frame will draw them (720x1280 fitted to the window). */
+	:root {
+		--bl-h: 100vh;
+		--bl-s: min(calc(100vw / 720), calc(var(--bl-h) / 1280));
+	}
+	@supports (height: 100dvh) {
+		:root { --bl-h: 100dvh; }
+	}
+	html, body {
+		background: linear-gradient(180deg, #9FD0F2 0%, #CDEFD9 100%) fixed;
+	}
+	body::before {
+		content: "Stackalot";
+		position: fixed;
+		left: calc((100vw - 720 * var(--bl-s)) / 2 + 100 * var(--bl-s));
+		top: calc((var(--bl-h) - 1280 * var(--bl-s)) / 2 + 150 * var(--bl-s));
+		width: calc(520 * var(--bl-s));
+		height: calc(225 * var(--bl-s));
+		padding-bottom: calc(14 * var(--bl-s));
+		box-sizing: border-box;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: url("scroll.webp") center / contain no-repeat;
+		font-family: "BaseLoaderFont", sans-serif;
+		font-size: calc(82 * var(--bl-s));
+		letter-spacing: calc(1 * var(--bl-s));
+		color: #4a2a17;
+	}
+	#base-loader {
+		position: fixed;
+		left: 0;
+		top: 0;
+		width: 100%;
+		height: 100%;
+		z-index: 100;
+		overflow: hidden;
+		background: linear-gradient(180deg, #9FD0F2 0%, #CDEFD9 100%);
+		font-family: "BaseLoaderFont", sans-serif;
+		-webkit-user-select: none;
+		user-select: none;
+		transition: opacity 0.35s ease-out;
+	}
+	#base-loader.bl-out {
+		opacity: 0;
+	}
+	#base-loader .bl-frame {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 720px;
+		height: 1280px;
+		transform-origin: 0 0;
+	}
+	#base-loader .bl-scroll {
+		position: absolute;
+		left: 100px;
+		top: 150px;
+		width: 520px;
+		height: 225px;
+		background: url("scroll.webp") center / contain no-repeat;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding-bottom: 14px;
+		box-sizing: border-box;
+		color: #4a2a17;
+		font-size: 82px;
+		letter-spacing: 1px;
+	}
+	#base-loader .bl-art {
+		position: absolute;
+		left: 0;
+		top: 0;
+	}
+	#base-loader .bl-floor {
+		transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.3, 1), opacity 0.06s linear;
+	}
+	#base-loader .bl-ring {
+		transform-box: fill-box;
+		transform-origin: center;
+		opacity: 0;
+	}
+	#base-loader .bl-ring.bl-on {
+		animation: bl-ring 0.6s ease-out both;
+	}
+	#base-loader .bl-cloud {
+		position: absolute;
+		left: 0;
+		height: 5vmin;
+		background: #fff;
+		border-radius: 0.6vmin;
+		box-shadow: inset 0 -1.4vmin 0 #e3eef8;
+		animation: bl-drift linear infinite;
+	}
+	#base-loader .bl-cloud::after {
+		content: "";
+		position: absolute;
+		left: 22%;
+		top: -2.8vmin;
+		width: 45%;
+		height: 3.2vmin;
+		background: #fff;
+		border-radius: 0.6vmin;
+	}
+	#base-loader .bl-version {
+		position: absolute;
+		left: 0;
+		right: 0;
+		text-align: center;
+		color: #4a2a17;
+		opacity: 0.45;
+	}
+	@keyframes bl-ring {
+		from { opacity: 1; transform: scale(0.85); }
+		to { opacity: 0; transform: scale(1.6); }
+	}
+	@keyframes bl-drift {
+		from { transform: translateX(-30vmin); }
+		to { transform: translateX(110vw); }
+	}
+	@media (prefers-reduced-motion: reduce) {
+		#base-loader .bl-floor { transition: none; }
+		#base-loader .bl-cloud { animation: none; display: none; }
+	}
+</style>
+ </head>
+ <body>
+  <div id="app-container">
+   <canvas id="canvas" tabindex="1" width="960" height="1480"></canvas>
+  </div>
+  <div id="webgl-not-supported">
+   <p>This game needs WebGL, which this browser has turned off.</p>
+  </div>
+  <script>
+	// Pre-Chrome-71 browsers have no globalThis; dmloader expects one.
+	if (typeof globalThis === 'undefined') { window.globalThis = window; }
+</script>
+  <script>
+/* -------------------------------------------------------------------------
+   Audio recovery + diagnostics for the Minit app.
+
+   THE WEAKNESS THIS COVERS. Defold's web sound device creates one AudioContext
+   at engine boot and, while that context is not "running", its _queue() throws
+   every buffer away and returns -- silently, with no error and no retry. The
+   only thing that ever resumes it is DefoldSoundDevice.TryResumeAudio(), which
+   the engine calls from its OWN canvas touch/mouse handlers. So if the context
+   is suspended at a moment when no further canvas touch arrives -- or the first
+   gesture is consumed before it reaches the canvas -- the game stays completely
+   silent while everything else works. That is the exact shape of the failure
+   reported in the app, and the engine has no recovery path of its own.
+
+   This adds one: resume on any gesture anywhere on the page (not just the
+   canvas), on visibility and focus changes, and on a short backing-off
+   watchdog. resume() outside a gesture is simply refused where that is not
+   allowed, so the attempt is free.
+
+   WHAT THIS DELIBERATELY DOES NOT DO. The app injects its own AudioContext
+   subclass whose `destination` is a mute gain it controls, and drives that gain
+   for focus, ducking and lifecycle fades. That gain is the app's business: if
+   the app has muted the drop, it is meant to be muted. Nothing here touches
+   _muteGain -- this only ever asks a suspended context to run.
+
+   DIAGNOSTICS. The app captures the page's console (window.__minitDrainLogs),
+   so one line is logged whenever the audio state changes. It reports both
+   halves of the question -- whether the context is running, and what the app's
+   own volume/gain is -- which tells apart "we are suspended" from "the app has
+   us muted".
+   ------------------------------------------------------------------------- */
+/* --- 0. Repair the host's volume channel (DROP-8164) -------------------
+   The app tells a game its volume with
+       window.postMessage(payload, window.location.origin)
+   and on iOS the game is served from the minitlocal:// custom scheme, whose
+   origin is OPAQUE -- so location.origin is the string "null", and postMessage
+   does not fail soft with that value, it THROWS. Every volume message the app
+   sends is therefore discarded: the seed baked into the injection at mount time
+   is the only value the page ever sees, and for a drop mounted before it was
+   focused that seed is 0. The game is then healthy and permanently inaudible.
+   Only a foreground transition fixes it, because __minitResumeAudio is a direct
+   call rather than a postMessage -- which is exactly the reported symptom.
+
+   Rather than guess what volume the host wanted, make its own message arrive:
+   retry with '*' when a same-window post is rejected for its target origin. The
+   host's real intent then flows through untouched, including a deliberate mute.
+   Harmless everywhere else -- on a normal origin the first call simply
+   succeeds. */
+(function () {
+	if (typeof window.postMessage !== 'function') { return; }
+	var native = window.postMessage.bind(window);
+	window.postMessage = function (message, targetOrigin, transfer) {
+		// The options overload, postMessage(message, { targetOrigin, transfer }),
+		// passes through untouched; the host uses the legacy string overload.
+		if (targetOrigin !== null && typeof targetOrigin === 'object') {
+			return native(message, targetOrigin);
+		}
+		try {
+			return native(message, targetOrigin, transfer);
+		} catch (err) {
+			// Only the target-origin rejection is retried; anything else (an
+			// unclonable payload, say) is a real error and must propagate.
+			if (!err || err.name !== 'SyntaxError' || targetOrigin === '*') { throw err; }
+			console.log('[minit-audio] postMessage origin ' + String(targetOrigin) +
+				' rejected; retrying same-window with "*"');
+			return native(message, '*', transfer);
+		}
+	};
+}());(function () {
+	var ctx = function () {
+		var shared = window._dmJSDeviceShared;
+		return shared && shared.audioCtx;
+	};
+
+	// Defold hands us the one context it owns. The constructor is wrapped as
+	// well so that ANY other context the page ends up with is repaired too: a
+	// repair that watches one of several contexts is indistinguishable from a
+	// repair that does not work -- healthy game, correct logic, wrong target,
+	// and only the app's foreground path recovers it.
+	var extra = [];
+	window.__minitAudioContexts = extra;
+	var Native = window.AudioContext || window.webkitAudioContext;
+	if (Native) {
+		var wrapCtor = function () {
+			var c = new Native(...arguments);
+			extra.push(c);
+			return c;
+		};
+		wrapCtor.prototype = Native.prototype;
+		window.AudioContext = wrapCtor;
+		window.webkitAudioContext = wrapCtor;
+	}
+
+	/** Defold's context plus anything else, deduped (usually the same object). */
+	function allContexts() {
+		var out = [], c = ctx();
+		if (c) { out.push(c); }
+		for (var i = 0; i < extra.length; i++) {
+			if (out.indexOf(extra[i]) === -1) { out.push(extra[i]); }
+		}
+		return out;
+	}
+	var last = '';
+	function report(why) {
+		try {
+			var c = ctx();
+			if (!c) return;
+			var gain = c._muteGain && c._muteGain.gain ? c._muteGain.gain.value : null;
+			var line = c.state + '|' + (gain === null ? 'nogain' : gain.toFixed(2))
+				+ '|' + (window.dropAudioVolume === undefined ? 'novol' : window.dropAudioVolume)
+				+ '|host=' + (hostSpoke ? 'spoke' : 'silent')
+				+ '|gestured=' + (gestured ? 'yes' : 'no')
+				+ '|n=' + allContexts().length;
+			if (line === last) return;
+			last = line;
+			console.log('[minit-audio] ' + line + ' (' + why + ') rate=' + c.sampleRate);
+		} catch (e) {}
+	}
+	// The second failure mode, and the one a background-and-return cures.
+	//
+	// The app's injected context routes the game through a mute gain it drives
+	// itself, seeded at 0 and faded up to window.dropAudioVolume shortly after
+	// the context is constructed. If that fade never lands, the game is
+	// perfectly healthy -- context running, engine mixing, buffers queued -- and
+	// completely inaudible. Returning from background is the one path that
+	// re-applies it (__minitResumeAudio explicitly fades to the desired volume),
+	// which is exactly the reported symptom.
+	//
+	// This re-applies the HOST'S OWN target using the host's own fadeVolume, and
+	// only when the host says it wants us audible (dropAudioVolume > 0) while the
+	// gain is still at zero. If the app has deliberately muted or ducked the drop
+	// it sets that value to 0 or DUCKED_VOLUME, and this does nothing -- so a
+	// muted drop stays muted and a fade-out is never fought.
+	// Did the host ever state a volume AT ALL? The distinction matters, because
+	// a mute and a silence nobody asked for look identical from in here: both
+	// are a mute gain sitting at 0. The app seeds that gain at 0 and states the
+	// real volume once, on document load; if the engine's context does not
+	// exist yet, nothing restates it until the next foreground transition --
+	// which is exactly the "no sound until I background the app and come back"
+	// symptom. So an explicit 0 is a real mute and is left alone, while a 0 we
+	// were merely never spoken to about is repaired, and only after a real
+	// gesture, so the player has demonstrably asked for the game.
+	var hostSpoke = false, gestured = false;
+	window.addEventListener('message', function (e) {
+		var d = e && e.data;
+		if (d && typeof d === 'object' && /^minit\.(fade|set)DropAudioVolume$/.test(d.type)) {
+			hostSpoke = true;
+			console.log('[minit-audio] host set volume ' + d.value +
+				' at ' + Math.round(performance.now()) + 'ms');
+		}
+	}, true);
+	// Per context, so a healthy context cannot reset another's stuck timer.
+	var stuckSince = new WeakMap();
+	function repairGain(why) {
+		var list = allContexts();
+		for (var i = 0; i < list.length; i++) { repairOne(list[i], why); }
+	}
+
+	function repairOne(c, why) {
+		try {
+			if (!c || !c._muteGain || !c._muteGain.gain) { if (c) { stuckSince.delete(c); } return; }
+			var target = window.dropAudioVolume;
+			if (typeof target !== 'number') { stuckSince.delete(c); return; }
+			if (target <= 0) {
+				// Host said 0: a deliberate mute, honoured. Host said nothing:
+				// nothing to honour, so bring the drop up to full once running.
+				if (hostSpoke || !gestured || c.state !== 'running') { stuckSince.delete(c); return; }
+				target = 1;
+			}
+			if (c._muteGain.gain.value > 0.001) { stuckSince.delete(c); return; }
+			// The host legitimately holds the gain at 0 briefly (a prime window,
+			// then a 0.3s ramp), so only act once it has plainly not arrived.
+			var now = Date.now();
+			var since = stuckSince.get(c);
+			if (!since) { stuckSince.set(c, now); return; }
+			if (now - since < 1500) return;
+			stuckSince.set(c, now);
+			if (typeof c.fadeVolume === 'function') {
+				c.fadeVolume(target, 0.3);
+				console.log('[minit-audio] ' + (hostSpoke ? 're-applied host volume ' :
+					'host never set a volume; restoring ') + target + ' (' + why + ')');
+			}
+		} catch (e) { }
+	}
+
+	function resume(why) {
+		var list = allContexts();
+		for (var i = 0; i < list.length; i++) {
+			try {
+				var c = list[i];
+				if (c && c.state !== 'running' && typeof c.resume === 'function') {
+					var p = c.resume();
+					if (p && p.then) { p.then(function () { report(why); }, function () { report(why + '-refused'); }); }
+				}
+			} catch (e) {}
+		}
+		repairGain(why);
+		report(why);
+	}
+
+	['touchstart', 'touchend', 'pointerdown', 'mousedown', 'click'].forEach(function (evt) {
+		// Capture phase, so this runs even if something else stops propagation
+		// before the canvas sees the gesture.
+		document.addEventListener(evt, function () { gestured = true; resume(evt); }, { capture: true, passive: true });
+	});
+	document.addEventListener('visibilitychange', function () {
+		if (!document.hidden) { resume('visible'); }
+	});
+	window.addEventListener('focus', function () { resume('focus'); });
+	window.addEventListener('pageshow', function () { resume('pageshow'); });
+
+	// Backing-off watchdog: often early on, rarely later. Covers a context that
+	// is suspended by app lifecycle at a moment when no gesture follows.
+	var tries = 0;
+	(function tick() {
+		tries++;
+		resume('watchdog');
+		var delay = tries < 20 ? 500 : (tries < 40 ? 2000 : 10000);
+		setTimeout(tick, delay);
+	})();
+}());
+</script>
+  <script id="engine-loader" type="text/javascript" src="dmloader.js"></script>
+  <script id="engine-start" type="text/javascript">
+	EngineLoader.load("canvas", "Stackalot");
+</script>
+  <script id="engine-setup" type="text/javascript">
+	(function () {
+		// The download's share of the progress; the engine moves the rest through base_loader
+		// (loader/web_loader.script runs loader/progress.lua and calls set_progress).
+		var DOWNLOAD_SHARE = 0.7;
+		// An engine silent this long while the page is visible is taken for dead, and the
+		// game is left uncovered instead of hidden. A hidden page runs no frames, so its
+		// time never counts: a minute in another tab is not a dead engine.
+		var SILENCE_MS = 30000;
+		var SVG = "http://www.w3.org/2000/svg";
+		var VERSION = "1.2.9.0";
+		var TITLE = "Stackalot";
+		// The tower: 8 floors on the island, in the 720x1280 frame. Iso boxes, 2:1.
+		var FLOORS = 8, CX = 360, PLATE_Y = 940, HW = 117, HH = 58.5, FH = 50;
+		// Each floor slides in along the iso axis from alternating sides, as in the game.
+		var SLIDE = [208, 104];
+		// One floor every this many ms at most, so a cached load still builds the tower.
+		var FLOOR_GAP = 140, FLOOR_GAP_DONE = 60;
+		// The longest the page stays up once the game is ready.
+		var CLOSE_MAX_MS = 4000;
+		var STONE = { top: "#e8d7ae", left: "#cdb48d", right: "#a98d68", mortar: "#8f7556", glass: "#2b3140" };
+		var GRASS = { top: "#7cc46c", left: "#68b15a", right: "#579b4a" };
+		var DIRT = { top: "#8b6a4e", left: "#8b6a4e", right: "#715440" };
+		var TREE = ["#4f8a3c", "#3f7330"];
+
+		var root = null, frame = null, tower = null, ring = null, version = null;
+		var download = 0, engine = 0, shown = 0, finished = false, closing = false;
+		var built = 0, nextAt = 0, timer = null;
+		var startedAt = Date.now(), lastWord = Date.now();
+		var BaseLoader = window.BaseLoader = { events: [] };
+
+		function mark(what) { BaseLoader.events.push([what, Date.now() - startedAt]); }
+
+		// Inside the Minit app the page is hidden until loading_done: nothing to show there.
+		function hosted() { return !!window.minit; }
+
+		function el(tag, cls, parent) {
+			var node = document.createElement(tag);
+			if (cls) node.className = cls;
+			if (parent) parent.appendChild(node);
+			return node;
+		}
+
+		function svgEl(tag, attrs, parent) {
+			var node = document.createElementNS(SVG, tag);
+			for (var k in attrs) node.setAttribute(k, attrs[k]);
+			if (parent) parent.appendChild(node);
+			return node;
+		}
+
+		function pts(list) {
+			return list.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+		}
+
+		// An iso box; cy is the centre of its top face.
+		function box(parent, cx, cy, hw, hh, h, c) {
+			svgEl("polygon", { points: pts([[cx - hw, cy], [cx, cy + hh], [cx, cy + hh + h], [cx - hw, cy + h]]), fill: c.left }, parent);
+			svgEl("polygon", { points: pts([[cx, cy + hh], [cx + hw, cy], [cx + hw, cy + h], [cx, cy + hh + h]]), fill: c.right }, parent);
+			svgEl("polygon", { points: pts([[cx, cy - hh], [cx + hw, cy], [cx, cy + hh], [cx - hw, cy]]), fill: c.top }, parent);
+		}
+
+		function floorShape(parent, i) {
+			var cy = PLATE_Y - (i + 1) * FH;
+			box(parent, CX, cy, HW, HH, FH, STONE);
+			function lf(u, v) { return [CX - HW + u * HW, cy + u * HH + v * FH]; }
+			function rf(u, v) { return [CX + u * HW, cy + HH - u * HH + v * FH]; }
+			svgEl("polyline", { points: pts([lf(0, 0.5), lf(1, 0.5), rf(1, 0.5)]), fill: "none", stroke: STONE.mortar, "stroke-width": 3 }, parent);
+			var face = i % 2 === 0 ? lf : rf;
+			svgEl("polygon", { points: pts([face(0.42, 0.18), face(0.58, 0.18), face(0.58, 0.44), face(0.42, 0.44)]), fill: STONE.glass }, parent);
+		}
+
+		function tree(parent, t) {
+			var x = CX + t[0], y = PLATE_Y + t[1], k = t[2];
+			svgEl("polygon", { points: pts([[x, y - 91 * k], [x + 29 * k, y], [x, y + 11 * k]]), fill: TREE[1] }, parent);
+			svgEl("polygon", { points: pts([[x, y - 91 * k], [x, y + 11 * k], [x - 29 * k, y]]), fill: TREE[0] }, parent);
+		}
+
+		// The ground and the trees behind the tower; the tree in front of it is drawn after the
+		// floors (frontTrees), or the tower covered its top (the director, 2026-11-08).
+		function island(parent) {
+			box(parent, CX, PLATE_Y + 21, 235, 117.5, 80, DIRT);
+			box(parent, CX, PLATE_Y, 235, 117.5, 27, GRASS);
+			[[-155, 5, 1], [139, 16, 0.85]].forEach(function (t) { tree(parent, t); });
+		}
+
+		function frontTrees(parent) {
+			tree(parent, [-80, 69, 0.75]);
+		}
+
+		function layout() {
+			if (!root) return;
+			var w = window.innerWidth, h = window.innerHeight;
+			var s = Math.min(w / 720, h / 1280);
+			frame.style.transform = "translate(" + (w - 720 * s) / 2 + "px," + (h - 1280 * s) / 2 + "px) scale(" + s + ")";
+			version.style.bottom = (40 * s) + "px";
+			version.style.fontSize = (24 * s) + "px";
+		}
+
+		// How many floors the progress has earned; the first one comes early.
+		function earned() {
+			return Math.min(FLOORS, Math.floor(shown * FLOORS + 0.5));
+		}
+
+		function addFloor() {
+			var i = built++;
+			var side = i % 2 === 0 ? -1 : 1;
+			var g = svgEl("g", { "class": "bl-floor" }, tower);
+			g.style.opacity = "0";
+			g.style.transform = "translate(" + side * SLIDE[0] + "px," + -SLIDE[1] + "px)";
+			floorShape(g, i);
+			// Two frames later the slide runs from the side to its place.
+			requestAnimationFrame(function () {
+				requestAnimationFrame(function () {
+					g.style.opacity = "1";
+					g.style.transform = "translate(0,0)";
+				});
+			});
+			if (built === FLOORS) {
+				setTimeout(function () {
+					if (ring) ring.setAttribute("class", "bl-ring bl-on");
+				}, 300);
+			}
+		}
+
+		// Floors come one at a time, never faster than FLOOR_GAP.
+		function pump() {
+			timer = null;
+			if (!root) return;
+			var want = closing ? FLOORS : earned();
+			if (built < want) {
+				var now = Date.now();
+				if (now < nextAt) {
+					timer = setTimeout(pump, nextAt - now);
+					return;
+				}
+				addFloor();
+				nextAt = now + (closing ? FLOOR_GAP_DONE : FLOOR_GAP);
+				// Closing, the pump runs once more after the last floor to start the fade: the
+				// engine says nothing after done, so no progress call would wake it (the loader
+				// stayed over the game when the game was ready before the tower, 2026-11-07).
+				if (built < want || closing) timer = setTimeout(pump, nextAt - now);
+				return;
+			}
+			if (closing && built === FLOORS) {
+				// The last floor lands and its ring flashes, then the page fades into the game.
+				timer = setTimeout(fadeOut, 650);
+			}
+		}
+
+		function fadeOut() {
+			if (!root) return;
+			var gone = root;
+			gone.className = "bl-out";
+			setTimeout(function () {
+				if (gone.parentNode) gone.parentNode.removeChild(gone);
+			}, 400);
+			window.removeEventListener("resize", layout);
+			root = null;
+			mark("faded");
+		}
+
+		function render() {
+			shown = Math.min(1, Math.max(shown, DOWNLOAD_SHARE * download + (1 - DOWNLOAD_SHARE) * engine));
+			if (hosted()) { BaseLoader.done(); return; }
+			if (root && !timer) pump();
+		}
+
+		function mount() {
+			if (root || finished || !document.body || hosted()) return;
+			root = el("div");
+			root.id = "base-loader";
+			[[18, 15, 22], [34, 27, 14], [10, 21, 30]].forEach(function (c) {
+				var cloud = el("div", "bl-cloud", root);
+				cloud.style.top = c[0] + "%";
+				cloud.style.width = c[2] + "vmin";
+				cloud.style.animationDuration = c[1] + "s";
+				cloud.style.animationDelay = (-c[1] * 0.45) + "s";
+			});
+			frame = el("div", "bl-frame", root);
+			var art = svgEl("svg", { "class": "bl-art", viewBox: "0 0 720 1280", width: 720, height: 1280 }, frame);
+			island(art);
+			tower = svgEl("g", {}, art);
+			frontTrees(art);
+			var top = PLATE_Y - FLOORS * FH;
+			ring = svgEl("polygon", {
+				"class": "bl-ring",
+				points: pts([[CX, top - HH - 16], [CX + HW + 32, top], [CX, top + HH + 16], [CX - HW - 32, top]]),
+				fill: "none", stroke: "#ffd34d", "stroke-width": 8
+			}, art);
+			var scroll = el("div", "bl-scroll", frame);
+			scroll.textContent = TITLE;
+			version = el("div", "bl-version", root);
+			version.textContent = VERSION ? "v" + VERSION : "";
+			document.body.appendChild(root);
+			window.addEventListener("resize", layout);
+			layout();
+			mark("mount");
+			render();
+		}
+
+		BaseLoader.setEngineProgress = function (share) {
+			lastWord = Date.now();
+			engine = Math.max(engine, Math.min(1, Number(share) || 0));
+			render();
+		};
+
+		function watchSilence() {
+			setTimeout(function () {
+				if (finished) return;
+				if (!document.hidden && Date.now() - lastWord >= SILENCE_MS) {
+					mark("safety");
+					BaseLoader.done();
+					return;
+				}
+				watchSilence();
+			}, 1000);
+		}
+
+		document.addEventListener("visibilitychange", function () {
+			if (!document.hidden) lastWord = Date.now();
+		});
+
+		// The game is ready: the tower gets its last floors, then the page fades into the
+		// game. Hosted, or with the page hidden (no frames, no transitions), it goes at once.
+		BaseLoader.done = function () {
+			if (finished) return;
+			finished = true;
+			mark("done");
+			if (!root) return;
+			if (hosted() || document.hidden) {
+				window.removeEventListener("resize", layout);
+				root.parentNode.removeChild(root);
+				root = null;
+				return;
+			}
+			closing = true;
+			if (timer) { clearTimeout(timer); timer = null; }
+			pump();
+			// Whatever the tower does, the game is never left covered.
+			setTimeout(fadeOut, CLOSE_MAX_MS);
+		};
+
+		BaseLoader.state = function () {
+			return { download: download, engine: engine, shown: shown, floors: built, finished: finished, mounted: root !== null };
+		};
+
+		// dmloader.js draws its own bar through ProgressView and removes it when main
+		// starts; this loader takes its place and outlives that moment. On the Minit shell
+		// this script runs after EngineLoader.load, so addProgress may have been and gone:
+		// the loader shows right here as well.
+		ProgressView.addProgress = function () { mount(); };
+		ProgressView.updateProgress = function (percentage) {
+			download = Math.max(download, Math.min(100, Number(percentage) || 0) / 100);
+			render();
+		};
+		ProgressView.removeProgress = function () {
+			mark("engine");
+			// Safari keeps the splash background otherwise (DEF-3061).
+			if (Module.canvas) Module.canvas.style.background = "none";
+		};
+		mount();
+
+		var previousError = CUSTOM_PARAMETERS["start_error"];
+		CUSTOM_PARAMETERS["start_error"] = function (error) {
+			mark("start_error");
+			BaseLoader.done();
+			if (typeof previousError === "function") previousError(error);
+		};
+		// Defold's GLFW takes a key only while the canvas is the focused element, and nothing
+		// focused it: a desktop player who walks with WASD or the arrows saw nothing happen
+		// until his first click (pet-shop on Poki, 18% of PC players gone, its T-219). The
+		// canvas takes the focus once main runs and again whenever the page gets it back (a
+		// click into a portal's frame, a return from another window), unless some other
+		// element holds it.
+		function focusCanvas() {
+			var canvas = Module.canvas;
+			if (!canvas || typeof canvas.focus !== "function") return;
+			var active = document.activeElement;
+			if (active && active !== canvas && active !== document.body && active !== document.documentElement) return;
+			if (!canvas.hasAttribute("tabindex")) canvas.setAttribute("tabindex", "1");
+			canvas.focus({ preventScroll: true });
+			mark(document.activeElement === canvas ? "focus" : "focus_refused");
+		}
+
+		var previousSuccess = CUSTOM_PARAMETERS["start_success"];
+		CUSTOM_PARAMETERS["start_success"] = function () {
+			mark("main");
+			lastWord = Date.now();
+			watchSilence();
+			focusCanvas();
+			window.addEventListener("focus", focusCanvas);
+			if (typeof previousSuccess === "function") previousSuccess();
+		};
+	})();
+</script>
+ </body>
+</html>
